@@ -1,4 +1,10 @@
-﻿using UnityEngine;
+﻿// ============================================================
+//  EnemyAI.cs  —  Enemigo VR con NavMesh
+//  FIXES aplicados:
+//   [A] Rigidbody configurado para no pelear con NavMeshAgent
+//   [B] Collider en hijo ahora propaga daño correctamente
+// ============================================================
+using UnityEngine;
 using UnityEngine.AI;
 
 public class EnemyAI : MonoBehaviour
@@ -15,6 +21,7 @@ public class EnemyAI : MonoBehaviour
 
     private NavMeshAgent agente;
     private Animator animator;
+    private Rigidbody rb;
     private float timerAtaque = 0f;
     private int vidaActual;
     private bool estaMuerto = false;
@@ -22,50 +29,102 @@ public class EnemyAI : MonoBehaviour
     private enum Estado { Idle, Persiguiendo, Atacando, Muerto }
     private Estado estadoActual = Estado.Idle;
 
-    // Parámetros exactos de tu AnimatorController
-    private const string PARAM_IS_WALKING = "isWalking"; // Bool
-    private const string TRIGGER_ATTACK   = "Attack";    // Trigger → Mutant Jump Attack
-    private const string TRIGGER_DEATH    = "Death";     // Trigger → Standing Death Forward 01
+    private const string PARAM_IS_WALKING = "isWalking";
+    private const string TRIGGER_ATTACK = "Attack";
+    private const string TRIGGER_DEATH = "Death";
 
+    // ─────────────────────────────────────────────────────────────
     void Start()
     {
-        agente     = GetComponent<NavMeshAgent>();
-        animator   = GetComponent<Animator>();
+        agente = GetComponent<NavMeshAgent>();
+        animator = GetComponent<Animator>() ?? GetComponentInChildren<Animator>();
+        rb = GetComponent<Rigidbody>();
         vidaActual = vidaMaxima;
 
-        // Si el Animator está en un hijo (el mesh)
-        if (animator == null)
-            animator = GetComponentInChildren<Animator>();
-
-        if (animator == null)
-            Debug.LogError("❌ No se encontró Animator en " + gameObject.name);
-        else if (animator.runtimeAnimatorController == null)
-            Debug.LogError("❌ El Animator no tiene AnimatorController en " + gameObject.name);
-        else
-            Debug.Log("✅ Animator listo");
-
-        if (jugador == null)
+        // FIX A: Rigidbody + NavMeshAgent → dejar que el agente controle la física
+        if (rb != null)
         {
-            Camera cam = Camera.main;
-            if (cam != null)
+            rb.isKinematic = true;          // El NavMeshAgent mueve el transform; el Rigidbody solo colisiona
+            rb.useGravity = false;         // El agente ya maneja la gravedad sobre el NavMesh
+            rb.constraints = RigidbodyConstraints.FreezeAll; // Evita que físicas externas lo desplacen
+            Debug.Log("✅ Rigidbody configurado como Kinematic para coexistir con NavMeshAgent");
+        }
+
+        // Validar NavMeshAgent
+        if (agente == null) { Debug.LogError("❌ Falta NavMeshAgent en " + name); enabled = false; return; }
+
+        if (!agente.isOnNavMesh)
+        {
+            NavMeshHit hit;
+            if (NavMesh.SamplePosition(transform.position, out hit, 5f, NavMesh.AllAreas))
             {
-                jugador = cam.transform;
-                Debug.Log("✅ Jugador asignado a: " + jugador.name);
+                transform.position = hit.position;
+                Debug.Log("✅ Reposicionado sobre NavMesh: " + hit.position);
             }
             else
             {
-                Debug.LogError("❌ No se encontró Camera.main");
+                Debug.LogError("❌ No hay NavMesh cerca del enemigo. Hornea el NavMesh.");
+                enabled = false; return;
             }
         }
+
+        // Validar Animator
+        if (animator == null || animator.runtimeAnimatorController == null)
+            Debug.LogWarning("⚠️ Animator no encontrado o sin Controller en " + name);
+
+        // Buscar jugador
+        if (jugador == null) BuscarJugador();
+
+        // FIX B: Registrar este script en todos los colliders hijos
+        // para que el Raycast que golpee cualquier parte del cuerpo funcione
+        RegistrarColisionesHijas();
     }
 
+    // FIX B: Añade EnemyHitProxy en cada Collider hijo que no tenga este script
+    void RegistrarColisionesHijas()
+    {
+        Collider[] colliders = GetComponentsInChildren<Collider>(includeInactive: true);
+        foreach (Collider col in colliders)
+        {
+            if (col.gameObject == gameObject) continue; // el raíz ya tiene este script
+            if (col.gameObject.GetComponent<EnemyHitProxy>() == null)
+            {
+                EnemyHitProxy proxy = col.gameObject.AddComponent<EnemyHitProxy>();
+                proxy.enemyAI = this;
+            }
+        }
+        Debug.Log($"✅ {colliders.Length} collider(s) enlazados al EnemyAI");
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    void BuscarJugador()
+    {
+        string[] tags = { "Player", "XRRig", "XR Rig" };
+        foreach (string tag in tags)
+        {
+            try
+            {
+                GameObject obj = GameObject.FindGameObjectWithTag(tag);
+                if (obj != null) { jugador = obj.transform; Debug.Log($"✅ Jugador: {obj.name}"); return; }
+            }
+            catch { }
+        }
+        if (Camera.main != null)
+        {
+            jugador = Camera.main.transform;
+            Debug.LogWarning("⚠️ Usando Camera.main como jugador. Asigna XR Origin si usas XR Toolkit.");
+        }
+        else Debug.LogError("❌ No se encontró jugador. Asígnalo en el Inspector.");
+    }
+
+    // ─────────────────────────────────────────────────────────────
     void Update()
     {
-        if (estaMuerto || jugador == null || agente == null) return;
+        if (estaMuerto || jugador == null || agente == null || !agente.isOnNavMesh) return;
 
-        Vector3 posEnemigo = new Vector3(transform.position.x, 0, transform.position.z);
-        Vector3 posJugador = new Vector3(jugador.position.x, 0, jugador.position.z);
-        float distancia = Vector3.Distance(posEnemigo, posJugador);
+        float distancia = Vector3.Distance(
+            new Vector3(transform.position.x, 0, transform.position.z),
+            new Vector3(jugador.position.x, 0, jugador.position.z));
 
         timerAtaque += Time.deltaTime;
 
@@ -74,7 +133,6 @@ public class EnemyAI : MonoBehaviour
             case Estado.Idle:
                 agente.ResetPath();
                 SetBool(PARAM_IS_WALKING, false);
-
                 if (distancia <= distanciaDeteccion)
                 {
                     estadoActual = Estado.Persiguiendo;
@@ -83,100 +141,78 @@ public class EnemyAI : MonoBehaviour
                 break;
 
             case Estado.Persiguiendo:
-                Vector3 destino = new Vector3(jugador.position.x, transform.position.y, jugador.position.z);
-                agente.SetDestination(destino);
-                SetBool(PARAM_IS_WALKING, true);
+                agente.SetDestination(jugador.position);
+                SetBool(PARAM_IS_WALKING, agente.velocity.magnitude > 0.1f);
 
-                if (distancia <= distanciaAtaque)
-                {
-                    agente.ResetPath();
-                    estadoActual = Estado.Atacando;
-                }
-                else if (distancia > distanciaDeteccion * 1.5f)
-                {
-                    estadoActual = Estado.Idle;
-                }
+                if (distancia <= distanciaAtaque) { agente.ResetPath(); estadoActual = Estado.Atacando; }
+                else if (distancia > distanciaDeteccion * 1.5f) estadoActual = Estado.Idle;
                 break;
 
             case Estado.Atacando:
                 agente.ResetPath();
                 SetBool(PARAM_IS_WALKING, false);
 
-                Vector3 dir = (jugador.position - transform.position).normalized;
-                dir.y = 0;
-                if (dir != Vector3.zero)
+                Vector3 dir = jugador.position - transform.position; dir.y = 0;
+                if (dir.sqrMagnitude > 0.01f)
                     transform.rotation = Quaternion.Slerp(transform.rotation,
-                        Quaternion.LookRotation(dir), Time.deltaTime * 5f);
+                        Quaternion.LookRotation(dir.normalized), Time.deltaTime * 5f);
 
-                if (timerAtaque >= tiempoEntreAtaques)
-                {
-                    Atacar();
-                    timerAtaque = 0f;
-                }
-
-                if (distancia > distanciaAtaque)
-                    estadoActual = Estado.Persiguiendo;
+                if (timerAtaque >= tiempoEntreAtaques) { Atacar(); timerAtaque = 0f; }
+                if (distancia > distanciaAtaque) estadoActual = Estado.Persiguiendo;
                 break;
         }
     }
 
+    // ─────────────────────────────────────────────────────────────
     void Atacar()
     {
-        Debug.Log("⚔️ Enemigo ataca");
+        Debug.Log("⚔️ Ataque");
         SetTrigger(TRIGGER_ATTACK);
-
         if (GameManager.instance != null)
             GameManager.instance.TakeDamage(dañoPorAtaque);
     }
 
-    // Llama este método cuando el enemigo recibe daño
+    // Llámado desde EnemyHitProxy o directamente desde el Raycast
     public void RecibirDaño(int daño)
     {
         if (estaMuerto) return;
-
         vidaActual -= daño;
-        Debug.Log($"💢 Enemigo recibió {daño} de daño. Vida: {vidaActual}/{vidaMaxima}");
-
-        if (vidaActual <= 0)
-            Morir();
+        Debug.Log($"💢 Daño: {daño} | Vida restante: {vidaActual}/{vidaMaxima}");
+        if (vidaActual <= 0) Morir();
     }
 
     void Morir()
     {
-        estaMuerto   = true;
-        estadoActual = Estado.Muerto;
-        Debug.Log("💀 Enemigo muerto");
-
+        estaMuerto = true; estadoActual = Estado.Muerto;
+        Debug.Log("💀 Muerto");
         SetTrigger(TRIGGER_DEATH);
-
-        if (agente != null)
-        {
-            agente.ResetPath();
-            agente.enabled = false;
-        }
-
-        // Destruye el GameObject al terminar la animación de muerte
+        if (agente != null) { agente.ResetPath(); agente.enabled = false; }
+        if (rb != null) rb.isKinematic = false; // Opcional: ragdoll al morir
         Destroy(gameObject, 3f);
     }
 
-    // Helpers con null check incorporado
-    void SetBool(string param, bool valor)
-    {
-        if (animator != null && animator.runtimeAnimatorController != null)
-            animator.SetBool(param, valor);
-    }
-
-    void SetTrigger(string param)
-    {
-        if (animator != null && animator.runtimeAnimatorController != null)
-            animator.SetTrigger(param);
-    }
+    void SetBool(string p, bool v) { if (animator && animator.runtimeAnimatorController) animator.SetBool(p, v); }
+    void SetTrigger(string p) { if (animator && animator.runtimeAnimatorController) animator.SetTrigger(p); }
 
     void OnDrawGizmosSelected()
     {
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, distanciaDeteccion);
-        Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, distanciaAtaque);
+        Gizmos.color = Color.yellow; Gizmos.DrawWireSphere(transform.position, distanciaDeteccion);
+        Gizmos.color = Color.red; Gizmos.DrawWireSphere(transform.position, distanciaAtaque);
+    }
+}
+
+
+// ============================================================
+//  EnemyHitProxy.cs  —  Se añade automáticamente a cada
+//  Collider hijo para propagar el daño del Raycast al EnemyAI
+// ============================================================
+public class EnemyHitProxy : MonoBehaviour
+{
+    [HideInInspector] public EnemyAI enemyAI;
+
+    public void RecibirDaño(int daño)
+    {
+        if (enemyAI != null)
+            enemyAI.RecibirDaño(daño);
     }
 }
