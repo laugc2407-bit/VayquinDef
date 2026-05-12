@@ -75,7 +75,7 @@ public class VRMenuSystem : MonoBehaviour
     void UpdateUI()
     {
         UpdateHealth();
-        collectiblesText.text = "Recolectados: " + GameManager.instance.collectibles;
+        collectiblesText.text = "=" + GameManager.instance.collectibles;
     }
 
     void UpdateHealth()
