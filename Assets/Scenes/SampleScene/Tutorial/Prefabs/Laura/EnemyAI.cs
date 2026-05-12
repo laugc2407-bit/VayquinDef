@@ -1,9 +1,4 @@
-﻿// ============================================================
-//  EnemyAI.cs  —  Enemigo VR con NavMesh
-//  FIXES aplicados:
-//   [A] Rigidbody configurado para no pelear con NavMeshAgent
-//   [B] Collider en hijo ahora propaga daño correctamente
-// ============================================================
+﻿
 using UnityEngine;
 using UnityEngine.AI;
 
