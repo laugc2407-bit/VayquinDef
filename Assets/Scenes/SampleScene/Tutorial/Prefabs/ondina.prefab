@@ -48,6 +48,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 23.925995
       objectReference: {fileID: 0}
+    - target: {fileID: -3013209808111494800, guid: cd4430f1084f44b42a5dd5c9e4ec06e5, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 3cb703808ab1d6e4dbf29d07c4a3ba69, type: 2}
+    - target: {fileID: -3013209808111494800, guid: cd4430f1084f44b42a5dd5c9e4ec06e5, type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 8a0dfdc56ee98be4495cfe18b475a37e, type: 2}
     - target: {fileID: 919132149155446097, guid: cd4430f1084f44b42a5dd5c9e4ec06e5, type: 3}
       propertyPath: m_Name
       value: ondina
