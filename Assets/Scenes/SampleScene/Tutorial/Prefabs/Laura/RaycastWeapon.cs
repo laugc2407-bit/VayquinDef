@@ -6,9 +6,9 @@ using UnityEngine.InputSystem;
 /// 
 /// Setup en Inspector:
 ///   - Arrastra la cámara principal (o el arma) en "origenDisparo"
-///   - El enemigo DEBE tener un Collider (no trigger) y el script EnemyAI
+///   - El enemigo DEBE tener un Collider (no trigger) y el script EnemyHealth
 ///   - Asegúrate de que el Collider esté en el GameObject raíz del enemigo
-///     o en un hijo con el script EnemyAI en el padre (usamos GetComponentInParent)
+///     o en un hijo con EnemyHealth en el padre (usamos GetComponentInParent)
 /// </summary>
 public class RaycastWeapon : MonoBehaviour
 {
@@ -34,7 +34,6 @@ public class RaycastWeapon : MonoBehaviour
 
     void Start()
     {
-        // Si no se asignó origen, usar la cámara principal
         if (origenDisparo == null)
         {
             if (Camera.main != null)
@@ -51,7 +50,6 @@ public class RaycastWeapon : MonoBehaviour
 
     void Update()
     {
-        // Nuevo Input System: Keyboard.current en lugar de Input.GetKeyDown
         if (Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame)
             Disparar();
     }
@@ -70,20 +68,20 @@ public class RaycastWeapon : MonoBehaviour
             Debug.Log($"🎯 Rayo golpeó: {impacto.collider.gameObject.name} " +
                       $"(layer: {LayerMask.LayerToName(impacto.collider.gameObject.layer)})");
 
-            // Buscar EnemyAI en el objeto golpeado o en su padre
-            // (cubre el caso en que el Collider está en un mesh hijo)
-            EnemyAI enemigo = impacto.collider.GetComponent<EnemyAI>()
-                           ?? impacto.collider.GetComponentInParent<EnemyAI>();
+            // ✅ CAMBIO CLAVE: busca EnemyHealth, no EnemyAI
+            EnemyHealth enemigo = impacto.collider.GetComponent<EnemyHealth>()
+                               ?? impacto.collider.GetComponentInParent<EnemyHealth>();
 
             if (enemigo != null)
             {
-                enemigo.RecibirDaño(dañoPorDisparo);
-                Debug.Log($"💥 Golpeó al enemigo: {enemigo.name}");
+                // ✅ CAMBIO: llama TakeDamage (el método correcto de EnemyHealth)
+                enemigo.TakeDamage(dañoPorDisparo);
+                Debug.Log($"💥 Golpeó al enemigo: {enemigo.name} — daño: {dañoPorDisparo}");
             }
             else
             {
                 Debug.LogWarning($"⚠️ Se golpeó '{impacto.collider.gameObject.name}' " +
-                                 "pero no tiene EnemyAI. ¿El Collider está en el objeto correcto?");
+                                 "pero no tiene EnemyHealth. ¿El Collider está en el objeto correcto?");
             }
 
             // Efecto de impacto visual

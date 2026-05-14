@@ -8,14 +8,14 @@ public class EnemyDamage : MonoBehaviour
     {
         Debug.Log("Entró: " + other.name);
 
-        // 🔥 Detecta si pertenece al XR Origin
         if (other.transform.root.name.Contains("XR Origin"))
         {
-            Debug.Log("Golpe al jugador");
+            // ✅ No daña si el enemigo ya está muerto
+            EnemyHealth health = GetComponentInParent<EnemyHealth>();
+            if (health != null && health.isDead) return;
 
+            Debug.Log("Golpe al jugador");
             GameManager.instance.TakeDamage(damage);
         }
     }
-
-    
 }
