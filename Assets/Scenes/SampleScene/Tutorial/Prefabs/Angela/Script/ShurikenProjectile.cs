@@ -24,15 +24,13 @@ public class ShurikenProjectile : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Enemigo"))
+        Debug.Log($"Shuriken tocó: {other.name} | Tag: {other.tag}");
+
+        EnemyHealth enemigo = other.GetComponentInParent<EnemyHealth>();
+        if (enemigo != null)
         {
-            EnemyHealth enemigo = other.GetComponentInParent<EnemyHealth>();
-
-            if (enemigo != null)
-            {
-                enemigo.TakeDamage(daño);
-            }
-
+            Debug.Log("🎯 Golpeó enemigo!");
+            enemigo.TakeDamage(daño);
             Destroy(gameObject);
             return;
         }
@@ -40,6 +38,7 @@ public class ShurikenProjectile : MonoBehaviour
         if (other.isTrigger) return;
         if (other.CompareTag("Player")) return;
 
-        Destroy(gameObject);
+        // TEMPORAL: comentar para que no se destruya con nada
+        // Destroy(gameObject);
     }
 }

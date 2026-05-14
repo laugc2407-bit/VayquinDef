@@ -1,58 +1,35 @@
 ﻿using UnityEngine;
-using UnityEngine.AI;
 
 public class EnemyHealth : MonoBehaviour
 {
-    [Header("Salud")]
-    public float maxHealth = 100f;
-    public float currentHealth;
+    [Header("Configuración")]
+    public int vidaMaxima = 3;
+    public int vidaActual;
     public bool isDead = false;
 
-    private Animator animator;
-    private NavMeshAgent agent;
-    private EnemyAI enemyAI;
 
     void Start()
     {
-        currentHealth = maxHealth;
-        animator = GetComponent<Animator>();
-        agent = GetComponent<NavMeshAgent>();
-        enemyAI = GetComponent<EnemyAI>();
+        vidaActual = vidaMaxima;
     }
 
-    public void TakeDamage(float amount)
+    // Ambos métodos hacen lo mismo
+    public void RecibirDaño(int daño) => TakeDamage(daño);
+
+    public void TakeDamage(int daño)
     {
         if (isDead) return;
+        vidaActual -= daño;
+        Debug.Log($"💥 Enemigo recibió daño. Vida: {vidaActual}/{vidaMaxima}");
 
-        currentHealth -= amount;
-        Debug.Log($"Enemigo recibió {amount} daño. Salud restante: {currentHealth}");
-
-        if (currentHealth <= 0)
-            Die();
+        if (vidaActual <= 0)
+            Morir();
     }
 
-    void Die()
+    void Morir()
     {
-        if (isDead) return;
         isDead = true;
-
-        // Activa tu Trigger Death → Standing ...Forward 01
-        animator.SetBool("isWalking", false);
-        animator.SetTrigger("Death");
-
-        // Detiene todo movimiento
-        agent.isStopped = true;
-        agent.velocity = Vector3.zero;
-        agent.enabled = false;
-
-        // Desactiva la IA
-        enemyAI.enabled = false;
-
-        // Desactiva el collider para que no siga siendo golpeado
-        Collider col = GetComponent<Collider>();
-        if (col != null) col.enabled = false;
-
-        // Destruye el GameObject después de que termine la animación
-        Destroy(gameObject, 4f);
+        Debug.Log("💀 Enemigo eliminado");
+        Destroy(gameObject);
     }
 }
